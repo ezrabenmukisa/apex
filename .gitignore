@@ -1,0 +1,12 @@
+#Virtual environment
+.venv/
+
+#Environment variables
+.env
+
+#Python cache files
+__pycache__/
+*.py[cod]
+
+#Firebase files
+app/core/serviceAccountKey.json
