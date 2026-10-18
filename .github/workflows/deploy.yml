@@ -71,7 +71,7 @@ jobs:
           }
 
           test -f /opt/apex/.env.production
-          test -f /opt/apex/secrets/firebase-service-account.json
+          test -f /opt/apex/secrets/serviceAccountKey.json
 
           printf '%s\n' "$GHCR_TOKEN" | docker_cmd login ghcr.io -u "$GHCR_USERNAME" --password-stdin
           docker_cmd pull "$APP_IMAGE"
@@ -84,7 +84,7 @@ jobs:
             --restart unless-stopped \
             -p 8000:8000 \
             --env-file /opt/apex/.env.production \
-            -v /opt/apex/secrets/firebase-service-account.json:/run/secrets/firebase-service-account.json:ro \
+            -v /opt/apex/secrets/serviceAccountKey.json:/run/secrets/serviceAccountKey.json:ro \
             "$APP_IMAGE"
 
           docker_cmd image prune -f
