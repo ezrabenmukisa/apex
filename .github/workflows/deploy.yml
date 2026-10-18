@@ -1,0 +1,91 @@
+name: Deploy
+
+on:
+  workflow_run:
+    workflows:
+      - Publish
+    types:
+      - completed
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CONTAINER_NAME: apex
+  IMAGE: ghcr.io/ezrabenmukisa/apex:latest
+
+jobs:
+  deploy:
+    name: Deploy to DigitalOcean
+    runs-on: ubuntu-latest
+    if: >-
+      ${{
+        github.event_name == 'workflow_dispatch' ||
+        (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+      }}
+
+    steps:
+      - name: Deploy over SSH
+        shell: bash
+        env:
+          DROPLET_HOST: ${{ secrets.DROPLET_HOST }}
+          DROPLET_USER: ${{ secrets.DROPLET_USER }}
+          DROPLET_SSH_KEY: ${{ secrets.DROPLET_SSH_KEY }}
+          GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+          IMAGE: ${{ env.IMAGE }}
+          CONTAINER_NAME: ${{ env.CONTAINER_NAME }}
+        run: |
+          set -euo pipefail
+
+          test -n "$DROPLET_HOST"
+          test -n "$DROPLET_USER"
+          test -n "$DROPLET_SSH_KEY"
+          test -n "$GHCR_USERNAME"
+          test -n "$GHCR_TOKEN"
+
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$DROPLET_SSH_KEY" > ~/.ssh/apex_deploy_key
+          chmod 600 ~/.ssh/apex_deploy_key
+          ssh-keyscan -H "$DROPLET_HOST" >> ~/.ssh/known_hosts
+
+          ssh -i ~/.ssh/apex_deploy_key "$DROPLET_USER@$DROPLET_HOST" \
+            bash -s -- "$IMAGE" "$CONTAINER_NAME" "$GHCR_USERNAME" "$GHCR_TOKEN" <<'REMOTE'
+          set -euo pipefail
+
+          APP_IMAGE="$1"
+          CONTAINER_NAME="$2"
+          GHCR_USERNAME="$3"
+          GHCR_TOKEN="$4"
+
+          docker_cmd() {
+            if docker info >/dev/null 2>&1; then
+              docker "$@"
+            else
+              sudo docker "$@"
+            fi
+          }
+
+          test -f /opt/apex/.env.production
+          test -f /opt/apex/secrets/firebase-service-account.json
+
+          printf '%s\n' "$GHCR_TOKEN" | docker_cmd login ghcr.io -u "$GHCR_USERNAME" --password-stdin
+          docker_cmd pull "$APP_IMAGE"
+
+          docker_cmd stop "$CONTAINER_NAME" >/dev/null 2>&1 || true
+          docker_cmd rm "$CONTAINER_NAME" >/dev/null 2>&1 || true
+
+          docker_cmd run -d \
+            --name "$CONTAINER_NAME" \
+            --restart unless-stopped \
+            -p 8000:8000 \
+            --env-file /opt/apex/.env.production \
+            -v /opt/apex/secrets/firebase-service-account.json:/run/secrets/firebase-service-account.json:ro \
+            "$APP_IMAGE"
+
+          docker_cmd image prune -f
+          REMOTE
