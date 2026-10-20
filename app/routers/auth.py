@@ -13,7 +13,6 @@ router = APIRouter(prefix="/auth", tags=["Auth"])
 
 @router.post("/firebase", summary="Authenticate via Firebase ID Token")
 def authenticate_firebase(payload: FirebaseAuthRequest, db: Session = Depends(get_db))-> FirebaseAuthResponse:
-    print(f"DEBUG: Recieved ID Token -> {payload.id_token}")
     try:
         user, profile_complete = sync_firebase_user(db=db, id_token=payload.id_token)
     except (firebase_auth_admin.InvalidIdTokenError, ValueError) as error:
