@@ -1,3 +1,4 @@
+import app.core.firebase
 from fastapi import FastAPI
 from app.routers import auth_router, user_router
 
