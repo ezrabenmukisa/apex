@@ -7,7 +7,7 @@ from app.database import get_db
 from app.schemas import FirebaseAuthRequest, FirebaseAuthResponse
 from app.services.auth import sync_firebase_user
 
-logging = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
