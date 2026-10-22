@@ -31,7 +31,7 @@ def get_current_user(
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User record not found in SafeLink database."
+            detail="User record not found in Apex database."
         )
 
     return user
