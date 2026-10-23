@@ -1,4 +1,5 @@
 import uuid
+from typing import TYPE_CHECKING
 from datetime import date, datetime
 from sqlalchemy import Uuid, String, Numeric, Date, DateTime, Enum as SqlEnum, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -7,6 +8,8 @@ from app.database import Base
 from app.models.base import TimestampMixin
 from app.models.enums import UserRole, ProjectStatus, InvitationStatus
 
+if TYPE_CHECKING:
+    from app.models.milestone import Milestone
 
 class Project(Base, TimestampMixin):
     __tablename__ = "projects"
@@ -23,9 +26,10 @@ class Project(Base, TimestampMixin):
     status: Mapped[ProjectStatus] = mapped_column(SqlEnum(ProjectStatus), default=ProjectStatus.ACTIVE, nullable=False)
 
     # Relationships
+    milestones: Mapped[list["Milestone"]] = relationship(back_populates="project", cascade="all, delete-orphan")
     members: Mapped[list["ProjectMember"]] = relationship(back_populates="project", cascade="all, delete-orphan")
     invitations: Mapped[list["ProjectInvitation"]] = relationship(back_populates="project", cascade="all, delete-orphan")
-
+    
 
 class ProjectMember(Base):
     __tablename__ = "project_members"

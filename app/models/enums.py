@@ -14,3 +14,9 @@ class InvitationStatus(str, enum.Enum):
     PENDING = "pending"
     ACCEPTED = "accepted"
     EXPIRED = "expired"
+
+class MilestoneStatus(str, enum.Enum):
+    PENDING = "PENDING"
+    IN_PROGRESS = "IN_PROGRESS"
+    COMPLETED = "COMPLETED"
+    DELAYED = "DELAYED"
