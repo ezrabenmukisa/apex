@@ -18,6 +18,12 @@ class Settings(BaseSettings):
     invite_base_url: str = Field(..., alias="INVITE_BASE_URL")
 
     android_sha256_cert_fingerprint: str = Field(..., alias="ANDROID_SHA256_CERT_FINGERPRINT")
+
+    aws_endpoint_url_s3: str = Field(..., alias="AWS_ENDPOINT_URL_S3")
+    aws_access_key_id: str = Field(..., alias="AWS_ACCESS_KEY_ID")
+    aws_secret_access_key: SecretStr = Field(..., alias="AWS_SECRET_ACCESS_KEY")
+    aws_region: str = Field("us-east-2", alias="AWS_REGION")
+    s3_bucket_name: str = Field(..., alias="S3_BUCKET_NAME")
     
     model_config = SettingsConfigDict(
         env_file = ".env",

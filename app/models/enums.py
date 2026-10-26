@@ -20,3 +20,15 @@ class MilestoneStatus(str, enum.Enum):
     IN_PROGRESS = "IN_PROGRESS"
     COMPLETED = "COMPLETED"
     DELAYED = "DELAYED"
+
+class EvidenceStatus(str, enum.Enum):
+    SUBMITTED = "SUBMITTED"
+    APPROVED = "APPROVED"
+    REQUEST_CHANGES = "REQUEST_CHANGES"
+    FLAGGED = "FLAGGED"
+
+
+class ReviewDecision(str, enum.Enum):
+    APPROVED = "APPROVED"
+    REQUEST_CHANGES = "REQUEST_CHANGES"
+    FLAGGED = "FLAGGED"
