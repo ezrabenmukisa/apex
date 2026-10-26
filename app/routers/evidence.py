@@ -3,8 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models.user import User
-from app.models.enums import UserRole
+from app.models import User, UserRole
 from app.core.dependencies import get_current_user
 from app.services.milestones import get_milestone_by_id
 from app.services.project import get_project_details
@@ -15,7 +14,7 @@ from app.services.evidence import (
     get_evidence_by_id,
     create_evidence_review
 )
-from app.schemas.evidence import (
+from app.schemas import (
     EvidenceUploadRequest,
     EvidenceUploadResponse,
     EvidenceCreate,

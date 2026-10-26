@@ -32,3 +32,8 @@ class ReviewDecision(str, enum.Enum):
     APPROVED = "APPROVED"
     REQUEST_CHANGES = "REQUEST_CHANGES"
     FLAGGED = "FLAGGED"
+
+class DevicePlatform(str, enum.Enum):
+    ANDROID = "android"
+    IOS = "ios"
+    WEB = "web"
