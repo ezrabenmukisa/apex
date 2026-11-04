@@ -1,4 +1,5 @@
 import uuid
+from typing import TYPE_CHECKING
 from datetime import date
 from decimal import Decimal
 from sqlalchemy import Uuid, String, Integer, Numeric, Date, Enum as SqlEnum, ForeignKey
@@ -8,6 +9,9 @@ from app.database import Base
 from app.models.project import Project
 from app.models.base import TimestampMixin
 from app.models.enums import MilestoneStatus
+
+if TYPE_CHECKING:
+    from app.models.evidence import ProgressEvidence
 
 
 class Milestone(Base, TimestampMixin):
@@ -23,5 +27,6 @@ class Milestone(Base, TimestampMixin):
     planned_budget: Mapped[Decimal | None] = mapped_column(Numeric(precision=12, scale=2), nullable=True)
     status: Mapped[MilestoneStatus] = mapped_column(SqlEnum(MilestoneStatus), default=MilestoneStatus.PENDING, nullable=False)
 
-    # Relationships
     project: Mapped["Project"] = relationship(back_populates="milestones")
+    # ProgressEvidence.milestone points back here; this side was missing (mapper error on first query)
+    evidence: Mapped[list["ProgressEvidence"]] = relationship(back_populates="milestone", cascade="all, delete-orphan")

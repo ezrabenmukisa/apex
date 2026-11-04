@@ -1,13 +1,22 @@
 import uuid
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 
 class UserProfileUpdate(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
     first_name: str | None = Field(None, min_length=1, max_length=255)
     middle_name: str | None = Field(None, max_length=255)
     last_name: str | None = Field(None, min_length=1, max_length=255)
     contact_email: EmailStr | None = None
     contact_phone: str | None = Field(None, max_length=20)
+
+    @field_validator("first_name", "last_name", "contact_email")
+    @classmethod
+    def required_fields_not_null(cls, v):
+        if v is None:
+            raise ValueError("cannot be null")
+        return v
 
 
 class UserProfileResponse(BaseModel):

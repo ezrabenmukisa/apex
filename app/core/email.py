@@ -2,9 +2,8 @@ import smtplib
 from email.message import EmailMessage
 from app.config import get_settings
 
-def send_invitation_email(to_email: str, project_name: str, invite_token: str) -> None:
+def send_invitation_email(to_email: str, project_name: str, invite_token: str, message: str = "") -> None:
     settings = get_settings()
-
     invite_link = f"{settings.invite_base_url}?token={invite_token}"
 
     msg = EmailMessage()
@@ -13,6 +12,7 @@ def send_invitation_email(to_email: str, project_name: str, invite_token: str) -
     msg["To"] = to_email
     msg.set_content(
         f"Hello,\n\nYou have been invited to collaborate on the project '{project_name}' on Apex.\n\n"
+        f"Message from the project owner:\n{message}\n\n"
         f"Use the link below to accept your invitation:\n{invite_link}\n\n"
         f"This invitation link expires in 7 days."
     )
@@ -20,11 +20,11 @@ def send_invitation_email(to_email: str, project_name: str, invite_token: str) -
     password = settings.mail_password.get_secret_value()
 
     if settings.mail_use_ssl:
-        with smtplib.SMTP_SSL(settings.mail_server, settings.mail_port) as server:
+        with smtplib.SMTP_SSL(settings.mail_server, settings.mail_port, timeout=10) as server:
             server.login(settings.mail_username, password)
             server.send_message(msg)
     else:
-        with smtplib.SMTP(settings.mail_server, settings.mail_port) as server:
+        with smtplib.SMTP(settings.mail_server, settings.mail_port, timeout=10) as server:
             server.starttls()
             server.login(settings.mail_username, password)
             server.send_message(msg)

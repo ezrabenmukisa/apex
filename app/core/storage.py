@@ -1,10 +1,13 @@
+import re
 import uuid
 import boto3
 from botocore.config import Config
+from botocore.exceptions import ClientError
 from fastapi import HTTPException
 from app.config import get_settings
 
 settings = get_settings()
+
 
 class S3StorageService:
     def __init__(self):
@@ -18,34 +21,41 @@ class S3StorageService:
         )
         self.bucket = settings.s3_bucket_name
 
-    def generate_presigned_upload_url(self, folder: str, filename: str, expiration: int = 900) -> tuple[str, str]:
-        """Generates a secure temporary PUT URL for direct client-side uploads (expires in 15 mins default)"""
-        file_ext = filename.split(".")[-1] if "." in filename else "bin"
-        file_key = f"{folder}/{uuid.uuid4()}.{file_ext}"
+    def generate_presigned_upload_url(self, prefix: str, filename: str, expiration: int = 900) -> tuple[str, str]:
+        """Temporary PUT URL for direct client uploads. `prefix` is built by the server, never by the client."""
+        ext = filename.rsplit(".", 1)[-1] if "." in filename else "bin"
+        ext = re.sub(r"[^A-Za-z0-9]", "", ext)[:10] or "bin"
+        file_key = f"{prefix}/{uuid.uuid4()}.{ext}"
 
         try:
             url = self.client.generate_presigned_url(
-                'put_object',
-                Params={
-                    'Bucket': self.bucket,
-                    'Key': file_key,
-                },
-                ExpiresIn=expiration
+                "put_object",
+                Params={"Bucket": self.bucket, "Key": file_key},
+                ExpiresIn=expiration,
             )
             return file_key, url
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Failed to generate upload URL: {str(e)}")
 
     def generate_presigned_url(self, file_key: str, expiration: int = 3600) -> str:
-        """Generates a temporary secure view URL since the bucket is private"""
+        """Temporary secure view URL since the bucket is private."""
         try:
-            url = self.client.generate_presigned_url(
-                'get_object',
-                Params={'Bucket': self.bucket, 'Key': file_key},
-                ExpiresIn=expiration
+            return self.client.generate_presigned_url(
+                "get_object",
+                Params={"Bucket": self.bucket, "Key": file_key},
+                ExpiresIn=expiration,
             )
-            return url
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Failed to generate secure file link: {str(e)}")
+
+    def object_exists(self, file_key: str) -> bool:
+        try:
+            self.client.head_object(Bucket=self.bucket, Key=file_key)
+            return True
+        except ClientError as e:
+            if e.response.get("Error", {}).get("Code") in ("404", "NoSuchKey", "NotFound"):
+                return False
+            raise HTTPException(status_code=502, detail="Storage service unavailable. Try again.")
+
 
 s3_service = S3StorageService()

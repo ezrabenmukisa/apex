@@ -2,13 +2,13 @@ import uuid
 import secrets
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta, timezone
-from app.core.email import send_invitation_email
 from app.schemas.project import ProjectCreate, ProjectUpdate
 from app.models.enums import UserRole, ProjectStatus, InvitationStatus
 from app.models.project import Project, ProjectMember, ProjectInvitation
+from app.models.user import User
+
 
 def create_project(db: Session, user_id: uuid.UUID, payload: ProjectCreate) -> Project:
-    # 1. Create the project instance
     project = Project(
         project_name=payload.project_name,
         description=payload.description,
@@ -21,19 +21,13 @@ def create_project(db: Session, user_id: uuid.UUID, payload: ProjectCreate) -> P
         status=ProjectStatus.ACTIVE
     )
     db.add(project)
-    db.flush()  # Generates project.project_id
+    db.flush()
 
-    # 2. Assign the creator as the OWNER in project_members
-    member = ProjectMember(
-        project_id=project.project_id,
-        user_id=user_id,
-        user_role=UserRole.OWNER
-    )
-    db.add(member)
-
+    db.add(ProjectMember(project_id=project.project_id, user_id=user_id, user_role=UserRole.OWNER))
     db.commit()
     db.refresh(project)
     return project
+
 
 def get_user_projects(db: Session, user_id: uuid.UUID, status: ProjectStatus | None = None) -> list[Project]:
     query = (
@@ -44,12 +38,12 @@ def get_user_projects(db: Session, user_id: uuid.UUID, status: ProjectStatus | N
     if status:
         query = query.filter(Project.status == status)
 
-    results = query.all()
     projects = []
-    for proj, role in results:
-        setattr(proj, "current_user_role", role)
+    for proj, role in query.all():
+        proj.current_user_role = role
         projects.append(proj)
     return projects
+
 
 def get_project_details(db: Session, project_id: uuid.UUID, user_id: uuid.UUID) -> Project | None:
     result = (
@@ -61,20 +55,46 @@ def get_project_details(db: Session, project_id: uuid.UUID, user_id: uuid.UUID) 
     if not result:
         return None
     proj, role = result
-    setattr(proj, "current_user_role", role)
+    proj.current_user_role = role
     return proj
 
-def update_project(db: Session, project: Project, payload: ProjectUpdate) -> Project:
-    update_data = payload.model_dump(exclude_unset=True)
-    for key, value in update_data.items():
-        setattr(project, key, value)
 
+def get_project_owner_ids(db: Session, project_id: uuid.UUID) -> list[uuid.UUID]:
+    rows = (
+        db.query(ProjectMember.user_id)
+        .filter(ProjectMember.project_id == project_id, ProjectMember.user_role == UserRole.OWNER)
+        .all()
+    )
+    return [r[0] for r in rows]
+
+
+def update_project(db: Session, project: Project, payload: ProjectUpdate) -> Project:
+    for key, value in payload.model_dump(exclude_unset=True).items():
+        setattr(project, key, value)
     db.commit()
     db.refresh(project)
     return project
 
-def get_project_members(db: Session, project_id: uuid.UUID) -> list[ProjectMember]:
-    return db.query(ProjectMember).filter(ProjectMember.project_id == project_id).all()
+
+def get_project_members(db: Session, project_id: uuid.UUID) -> list[dict]:
+    rows = (
+        db.query(ProjectMember, User)
+        .join(User, User.user_id == ProjectMember.user_id)
+        .filter(ProjectMember.project_id == project_id)
+        .all()
+    )
+    return [
+        {
+            "project_id": m.project_id,
+            "user_id": m.user_id,
+            "user_role": m.user_role,
+            "first_name": u.first_name,
+            "last_name": u.last_name,
+            "contact_email": u.contact_email,
+        }
+        for m, u in rows
+    ]
+
 
 def remove_project_member(db: Session, project_id: uuid.UUID, user_id: uuid.UUID) -> bool:
     member = db.query(ProjectMember).filter(
@@ -87,30 +107,23 @@ def remove_project_member(db: Session, project_id: uuid.UUID, user_id: uuid.UUID
     db.commit()
     return True
 
-def create_project_invitation(db: Session, project_id: uuid.UUID, project_name: str, email: str, user_role: UserRole) -> ProjectInvitation:
-    token = secrets.token_urlsafe(32)
-    expires_at = datetime.now(timezone.utc) + timedelta(days=7)
 
+def create_project_invitation(db: Session, project_id: uuid.UUID, email: str, user_role: UserRole) -> ProjectInvitation:
     invitation = ProjectInvitation(
         project_id=project_id,
-        email=email,
+        email=email.lower(),
         user_role=user_role,
-        token=token,
+        token=secrets.token_urlsafe(32),
         status=InvitationStatus.PENDING,
-        expires_at=expires_at
+        expires_at=datetime.now(timezone.utc) + timedelta(days=7),
     )
     db.add(invitation)
     db.commit()
     db.refresh(invitation)
-
-    try:
-        send_invitation_email(email, project_name, token)
-    except Exception as e:
-        print(f"Failed to send SMTP email: {e}")
-
     return invitation
 
-def accept_project_invitation(db: Session, token: str, user_id: uuid.UUID, user_email: str) -> ProjectMember:
+
+def accept_project_invitation(db: Session, token: str, user_id: uuid.UUID, user_email: str | None) -> ProjectMember:
     invitation = db.query(ProjectInvitation).filter(
         ProjectInvitation.token == token,
         ProjectInvitation.status == InvitationStatus.PENDING
@@ -124,8 +137,8 @@ def accept_project_invitation(db: Session, token: str, user_id: uuid.UUID, user_
         db.commit()
         raise ValueError("This invitation has expired.")
 
-    if invitation.email.lower() != user_email.lower():
-        raise ValueError("This invitation was sent to a different email address.")
+    if not user_email or invitation.email.lower() != user_email.lower():
+        raise ValueError("This invitation was sent to a different email address. Update your profile email to match.")
 
     existing_member = db.query(ProjectMember).filter(
         ProjectMember.project_id == invitation.project_id,
@@ -137,11 +150,7 @@ def accept_project_invitation(db: Session, token: str, user_id: uuid.UUID, user_
         db.commit()
         return existing_member
 
-    member = ProjectMember(
-        project_id=invitation.project_id,
-        user_id=user_id,
-        user_role=invitation.user_role
-    )
+    member = ProjectMember(project_id=invitation.project_id, user_id=user_id, user_role=invitation.user_role)
     db.add(member)
     invitation.status = InvitationStatus.ACCEPTED
     db.commit()

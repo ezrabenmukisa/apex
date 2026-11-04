@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
-from app.models.notification import DevicePlatform
+from app.models.enums import DevicePlatform
 
 
 class DeviceTokenCreate(BaseModel):
@@ -12,8 +12,6 @@ class DeviceTokenCreate(BaseModel):
 class DeviceTokenResponse(BaseModel):
     message: str
     fcm_token: str
-
-    model_config = ConfigDict(from_attributes=True)
 
 
 class NotificationUpdate(BaseModel):
@@ -28,3 +26,7 @@ class NotificationResponse(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class NotificationListResponse(BaseModel):
+    items: list[NotificationResponse]

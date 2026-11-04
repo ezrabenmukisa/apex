@@ -11,6 +11,10 @@ from app.models.enums import UserRole, ProjectStatus, InvitationStatus
 if TYPE_CHECKING:
     from app.models.milestone import Milestone
 
+# Defined ONCE and shared by both tables. Stores the enum VALUES ("owner", "manager", "member").
+user_role_type = SqlEnum(UserRole,name="user_role_enum",values_callable=lambda obj: [e.value for e in obj],create_type=False,)
+
+
 class Project(Base, TimestampMixin):
     __tablename__ = "projects"
 
@@ -25,18 +29,19 @@ class Project(Base, TimestampMixin):
     target_completion_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     status: Mapped[ProjectStatus] = mapped_column(SqlEnum(ProjectStatus), default=ProjectStatus.ACTIVE, nullable=False)
 
-    # Relationships
     milestones: Mapped[list["Milestone"]] = relationship(back_populates="project", cascade="all, delete-orphan")
     members: Mapped[list["ProjectMember"]] = relationship(back_populates="project", cascade="all, delete-orphan")
     invitations: Mapped[list["ProjectInvitation"]] = relationship(back_populates="project", cascade="all, delete-orphan")
-    
+
 
 class ProjectMember(Base):
     __tablename__ = "project_members"
 
     project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.project_id", ondelete="CASCADE"), primary_key=True)
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.user_id", ondelete="CASCADE"), primary_key=True)
-    user_role: Mapped[UserRole] = mapped_column(SqlEnum(UserRole, name="user_role_enum", values_callable=lambda obj: [e.value for e in obj]), nullable=False)
+    user_role: Mapped[UserRole] = mapped_column(user_role_type, nullable=False)
+
+    project: Mapped["Project"] = relationship(back_populates="members")
 
 
 class ProjectInvitation(Base, TimestampMixin):
@@ -44,8 +49,8 @@ class ProjectInvitation(Base, TimestampMixin):
 
     invitation_id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.project_id", ondelete="CASCADE"), nullable=False)
-    email: Mapped[str] = mapped_column(String(255), nullable=False)
-    user_role: Mapped[UserRole] = mapped_column(SqlEnum(UserRole, name="user_role_enum"), nullable=False)
+    email: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    user_role: Mapped[UserRole] = mapped_column(user_role_type, nullable=False)
     token: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
     status: Mapped[InvitationStatus] = mapped_column(SqlEnum(InvitationStatus), default=InvitationStatus.PENDING, nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
