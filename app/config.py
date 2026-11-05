@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     invite_base_url: str = Field(..., alias="INVITE_BASE_URL")
 
     android_sha256_cert_fingerprint: str = Field(..., alias="ANDROID_SHA256_CERT_FINGERPRINT")
+    android_debug_sha256_cert_fingerprint: str = Field(..., alias="ANDROID_DEBUG_SHA256_CERT_FINGERPRINT")
 
     aws_endpoint_url_s3: str = Field(..., alias="AWS_ENDPOINT_URL_S3")
     aws_access_key_id: str = Field(..., alias="AWS_ACCESS_KEY_ID")
